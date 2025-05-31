@@ -1,0 +1,25 @@
+[project]
+name = "scrapechecker"
+version = "0.1.0"
+description = "Scrape websites and check for changes"
+authors = [{ name = "Danny Stewart", email = "danny@stewart.cc" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "polykit (>=0.11.1)",
+    "selenium (>=4.33.0,<5.0.0)",
+    "webdriver-manager (>=4.0.2,<5.0.0)",
+]
+
+[tool.poetry.group.dev.dependencies]
+polykit = { path = "../polykit" }
+mypy = "^1.16.0"
+ruff = "^0.11.12"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project.scripts]
+roo = "scrapechecker.scrapers.contest_monitor:main"
