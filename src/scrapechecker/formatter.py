@@ -231,17 +231,16 @@ class Formatter:
             old_rank = old_item.get("rank")
             new_rank = new_item.get("rank")
 
-            # Only include competitors who moved into target's current rank range
+            # Only include competitors who directly threaten target by moving above them
             if (
                 new_rank
                 and target_new_rank
-                and new_rank <= target_new_rank  # Competitor is now at or above target
+                and new_rank < target_new_rank  # Competitor is now ABOVE target (lower rank number)
                 and (
                     # Competitor improved to threaten target's position
                     old_rank is None  # New competitor
                     or (
-                        old_rank
-                        and old_rank > target_new_rank  # Moved from below to above/equal target
+                        old_rank and old_rank >= target_new_rank  # Moved above target from at/below
                     )
                 )
             ):

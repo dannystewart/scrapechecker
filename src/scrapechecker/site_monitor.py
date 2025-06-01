@@ -70,18 +70,19 @@ class SiteMonitor:
         # Update daily status
         self.update_daily_status(new_items, removed_items, changed_items)
 
-        # Filter changes to only target contestant for notifications
-        filtered_new, filtered_removed, filtered_changed = self.change_finder.filter_to_target_only(
-            new_items, removed_items, changed_items
-        )
-
-        # Send notifications only if target contestant has changes
-        if filtered_new or filtered_removed or filtered_changed:
+        # Send notifications if there are any changes (focused filtering applied in formatter)
+        if new_items or removed_items or changed_items:
             message = self.formatter.format_changes_message(
-                filtered_new, filtered_removed, filtered_changed, current_items
+                new_items, removed_items, changed_items, current_items
             )
-            self.logger.debug(message)
-            self.send_telegram_alert(message)
+
+            # Only send if the formatted message has actual content
+            if message and "Key Change" in message:
+                self.send_telegram_alert(message)
+            else:
+                self.logger.info("No relevant changes detected for notifications.")
+        else:
+            self.logger.info("No changes detected.")
 
         # Display results
         if not current_items:
@@ -288,18 +289,14 @@ class SiteMonitor:
                 current_items, previous_items
             )
 
-            # Filter changes to only target contestant for notifications
-            filtered_new, filtered_removed, filtered_changed = (
-                self.change_finder.filter_to_target_only(new_items, removed_items, changed_items)
-            )
-
-            if not (filtered_new or filtered_removed or filtered_changed):
-                self.logger.info("No target-relevant changes to replay.")
+            # Use the same focused filtering as live monitoring
+            if not (new_items or removed_items or changed_items):
+                self.logger.info("No changes to replay.")
                 return None
 
-            # Format the message
+            # Format the message with focused filtering
             message = self.formatter.format_changes_message(
-                filtered_new, filtered_removed, filtered_changed, current_items
+                new_items, removed_items, changed_items, current_items
             )
 
             self.logger.info("Replayed changes from history:")
