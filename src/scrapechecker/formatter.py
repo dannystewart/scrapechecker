@@ -228,7 +228,7 @@ class Formatter:
         if target_old_rank is None:
             return focused_items
 
-        # Second pass: find competitors who crossed paths with target
+        # Second pass: find competitors who directly threaten target's position
         for old_item, new_item, changes in changed_items:
             if "name" in new_item and target_name in new_item["name"].lower():
                 continue  # Skip target (already added)
@@ -236,27 +236,17 @@ class Formatter:
             old_rank = old_item.get("rank")
             new_rank = new_item.get("rank")
 
-            # Include if this competitor passed the target or got passed by target
+            # Only include competitors who moved into target's current rank range
             if (
-                old_rank
-                and new_rank
-                and target_old_rank
+                new_rank
                 and target_new_rank
-                and old_rank != new_rank  # Competitor must have changed ranks
+                and new_rank <= target_new_rank  # Competitor is now at or above target
                 and (
-                    # Competitor passed target
-                    (old_rank > target_new_rank and new_rank <= target_new_rank)
-                    # Target passed competitor
-                    or (old_rank <= target_new_rank and new_rank > target_new_rank)
-                    # Handle case where target changed ranks
+                    # Competitor improved to threaten target's position
+                    old_rank is None  # New competitor
                     or (
-                        target_old_rank != target_new_rank
-                        and (
-                            # Competitor moved from worse to better than target's old rank
-                            (old_rank > target_old_rank and new_rank <= target_old_rank)
-                            # Competitor moved from better to worse than target's old rank
-                            or (old_rank <= target_old_rank and new_rank > target_old_rank)
-                        )
+                        old_rank
+                        and old_rank > target_new_rank  # Moved from below to above/equal target
                     )
                 )
             ):
