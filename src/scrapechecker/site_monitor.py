@@ -128,8 +128,17 @@ class SiteMonitor:
         try:
             with Path(self.data_file).open(encoding="utf-8") as f:
                 data = json.load(f)
-            self.logger.debug("Previous data loaded from %s.", self.data_file)
-            return data
+
+            # Handle both old format (list) and new format (dict with history)
+            if isinstance(data, list):
+                self.logger.debug("Previous data loaded from %s (legacy format).", self.data_file)
+                return data
+            if isinstance(data, dict) and "current" in data:
+                self.logger.debug("Previous data loaded from %s.", self.data_file)
+                return data["current"]
+
+            self.logger.warning("Unexpected data format in %s. Starting fresh.", self.data_file)
+            return []
         except FileNotFoundError:
             self.logger.warning("No previous data file found. Starting fresh.")
             return []
@@ -138,11 +147,32 @@ class SiteMonitor:
             return []
 
     def save_current_data(self, items: list[dict[str, Any]]) -> None:
-        """Save current data to file."""
+        """Save current data to file with history."""
         try:
+            # Load existing data to preserve history
+            existing_data: dict[str, Any] = {}
+            try:
+                with Path(self.data_file).open(encoding="utf-8") as f:
+                    loaded_data = json.load(f)
+                    # Handle legacy format
+                    if isinstance(loaded_data, list):
+                        existing_data = {"current": loaded_data}
+                    elif isinstance(loaded_data, dict):
+                        existing_data = loaded_data
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
+
+            # Create new data structure with history
+            new_data = {
+                "current": items,
+                "previous": existing_data.get("current", []),
+                "timestamp": datetime.now(tz=TZ).isoformat(),
+                "previous_timestamp": existing_data.get("timestamp"),
+            }
+
             with Path(self.data_file).open("w", encoding="utf-8") as f:
-                json.dump(items, f, indent=2)
-            self.logger.debug("Data saved to %s.", self.data_file)
+                json.dump(new_data, f, indent=2)
+            self.logger.debug("Data saved to %s with history.", self.data_file)
         except Exception as e:
             self.logger.error("Failed to save data: %s", str(e))
 
@@ -231,3 +261,56 @@ class SiteMonitor:
             new_items, removed_items, changed_items, sample_data
         )
         self.send_telegram_alert(f"<b>--- TEST NOTIFICATION ---</b>\n\n{message}")
+
+    def replay_last_changes(self) -> str | None:
+        """Replay the last detected changes for testing notification formatting.
+
+        Returns:
+            The formatted change message if history is available, None otherwise.
+        """
+        try:
+            with Path(self.data_file).open(encoding="utf-8") as f:
+                data = json.load(f)
+
+            if not isinstance(data, dict) or "current" not in data or "previous" not in data:
+                self.logger.warning("No change history available for replay.")
+                return None
+
+            current_items = data["current"]
+            previous_items = data["previous"]
+
+            if not previous_items:
+                self.logger.warning("No previous data available for replay.")
+                return None
+
+            # Find changes between previous and current
+            new_items, removed_items, changed_items = self.change_finder.find_changes(
+                current_items, previous_items
+            )
+
+            # Filter changes to only target contestant for notifications
+            filtered_new, filtered_removed, filtered_changed = (
+                self.change_finder.filter_to_target_only(new_items, removed_items, changed_items)
+            )
+
+            if not (filtered_new or filtered_removed or filtered_changed):
+                self.logger.info("No target-relevant changes to replay.")
+                return None
+
+            # Format the message
+            message = self.formatter.format_changes_message(
+                filtered_new, filtered_removed, filtered_changed, current_items
+            )
+
+            self.logger.info("Replayed changes from history:")
+            self.logger.info(message)
+
+            # Send via Telegram
+            self.send_telegram_alert(message)
+            self.logger.info("Replayed message sent via Telegram.")
+
+            return message
+
+        except Exception as e:
+            self.logger.error("Failed to replay changes: %s", str(e))
+            return None

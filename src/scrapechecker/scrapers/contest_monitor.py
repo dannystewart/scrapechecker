@@ -32,6 +32,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-alert", action="store_true", help="Send a test notification")
     parser.add_argument("--send", action="store_true", help="Send current rankings")
     parser.add_argument(
+        "--replay", action="store_true", help="Replay last detected changes for testing"
+    )
+    parser.add_argument(
         "--data-file", help="File to store contest data (default: user data directory)"
     )
     parser.add_argument(
@@ -99,6 +102,12 @@ def main() -> None:
             print(f"Current rankings sent! ({len(current_rankings)} contestants)")
         else:
             print("No rankings found.")
+        return
+
+    if args.replay:
+        # Replay last detected changes for testing
+        monitor.replay_last_changes()
+        print("Last detected changes replayed!")
         return
 
     # Run the monitoring
