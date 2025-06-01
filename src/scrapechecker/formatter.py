@@ -95,10 +95,18 @@ class Formatter:
 
     def _format_changed_items(self, changed_items: list[tuple]) -> str:
         """Format changed items section."""
-        count = len(changed_items)
-        items_to_show = changed_items[: self.max_results]
+        # Filter to relevant changes when we have a target
+        if self.site_scraper.target_item:
+            items_to_show = self._get_focused_changes(changed_items)
+        else:
+            items_to_show = changed_items[: self.max_results]
 
-        message = f"<b>🔄 {count} Changed Item{'s' if count != 1 else ''}:</b>\n"
+        if not items_to_show:
+            return ""  # No relevant changes to show
+
+        message = (
+            f"<b>🔄 {len(items_to_show)} Key Change{'s' if len(items_to_show) != 1 else ''}:</b>\n"
+        )
 
         for _old_item, new_item, changes in items_to_show:
             formatted = self.site_scraper.format_item(new_item)
@@ -107,9 +115,6 @@ class Formatter:
             # Show what changed
             for field, (old_val, new_val) in changes.items():
                 message += f"  └ <b>{field}:</b> {old_val} → {new_val}\n"
-
-        if count > self.max_results:
-            message += f"... and {count - self.max_results} more\n"
 
         return message.rstrip()
 
@@ -189,6 +194,58 @@ class Formatter:
         end_index = target_index + items_below + 1
 
         return items[start_index:end_index]
+
+    def _get_focused_changes(self, changed_items: list[tuple]) -> list[tuple]:
+        """Get a focused view of changed items around the target contestant.
+
+        Args:
+            changed_items: All changed items.
+
+        Returns:
+            A filtered list focusing on target contestant and nearby competitors.
+        """
+        if not self.site_scraper.target_item:
+            return changed_items[: self.max_results]
+
+        target_name = self.site_scraper.target_item.lower()
+        focused_items = []
+        target_old_rank = None
+        target_new_rank = None
+
+        # First pass: find target's old and new ranks
+        for old_item, new_item, changes in changed_items:
+            if "name" in new_item and target_name in new_item["name"].lower():
+                target_old_rank = old_item.get("rank")
+                target_new_rank = new_item.get("rank")
+                focused_items.append((old_item, new_item, changes))
+                break
+
+        # If no target found, return empty
+        if target_old_rank is None:
+            return focused_items
+
+        # Second pass: find competitors who crossed paths with target
+        for old_item, new_item, changes in changed_items:
+            if "name" in new_item and target_name in new_item["name"].lower():
+                continue  # Skip target (already added)
+
+            old_rank = old_item.get("rank")
+            new_rank = new_item.get("rank")
+
+            # Include if this competitor passed the target or got passed by target
+            if (
+                old_rank
+                and new_rank
+                and target_old_rank
+                and target_new_rank
+                and (
+                    (old_rank > target_old_rank and new_rank <= target_new_rank)
+                    or (old_rank < target_old_rank and new_rank >= target_new_rank)
+                )
+            ):
+                focused_items.append((old_item, new_item, changes))
+
+        return focused_items
 
     def format_full_rankings(self, current_items: list[dict[str, Any]]) -> str:
         """Format full rankings without filtering (used for --send command)."""
