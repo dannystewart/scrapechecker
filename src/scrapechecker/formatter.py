@@ -242,9 +242,22 @@ class Formatter:
                 and new_rank
                 and target_old_rank
                 and target_new_rank
+                and old_rank != new_rank  # Competitor must have changed ranks
                 and (
-                    (old_rank > target_old_rank and new_rank <= target_new_rank)
-                    or (old_rank < target_old_rank and new_rank >= target_new_rank)
+                    # Competitor passed target
+                    (old_rank > target_new_rank and new_rank <= target_new_rank)
+                    # Target passed competitor
+                    or (old_rank <= target_new_rank and new_rank > target_new_rank)
+                    # Handle case where target changed ranks
+                    or (
+                        target_old_rank != target_new_rank
+                        and (
+                            # Competitor moved from worse to better than target's old rank
+                            (old_rank > target_old_rank and new_rank <= target_old_rank)
+                            # Competitor moved from better to worse than target's old rank
+                            or (old_rank <= target_old_rank and new_rank > target_old_rank)
+                        )
+                    )
                 )
             ):
                 focused_items.append((old_item, new_item, changes))
