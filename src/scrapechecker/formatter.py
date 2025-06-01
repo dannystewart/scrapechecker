@@ -126,7 +126,7 @@ class Formatter:
 
         if self.site_scraper.target_item:
             # For change notifications, only show a focused view around the target
-            items_to_show = self._get_focused_rankings(current_items, max_items=5)
+            items_to_show = self._get_focused_rankings(current_items, max_items=7)
             if len(items_to_show) < count:
                 message = f"<b>📊 Current Rankings (showing {len(items_to_show)} of {count}):</b>\n"
             else:
@@ -146,51 +146,46 @@ class Formatter:
         return message.rstrip()
 
     def _get_focused_rankings(
-        self, items: list[dict[str, Any]], max_items: int = 5
+        self, items: list[dict[str, Any]], max_items: int = 7
     ) -> list[dict[str, Any]]:
-        """Get a focused view of rankings around the target contestant.
+        """Get a focused view of rankings with adaptive strategy.
+
+        When target is close to top (within 10 spots): Show path to #1
+        When target is further back: Show local context (±2 around target)
 
         Args:
             items: All ranking items, assumed to be sorted by rank.
             max_items: Maximum number of items to return.
 
         Returns:
-            A filtered list focusing on target contestant and nearby competitors.
+            A filtered list with adaptive focus strategy.
         """
         if not self.site_scraper.target_item:
             return items[:max_items]
 
         target_name = self.site_scraper.target_item.lower()
         target_index = None
+        target_rank = None
 
         # Find the target contestant
         for i, item in enumerate(items):
             if "name" in item and target_name in item["name"].lower():
                 target_index = i
+                target_rank = item.get("rank", i + 1)  # Use rank or position as fallback
                 break
 
-        if target_index is None:
-            # Target not found, return top items
+        if target_index is None:  # Target not found, return top items
             return items[:max_items]
 
-        # Calculate how many items to show above and below target (at least 2)
+        # Adaptive strategy based on target's rank
+        if target_rank and target_rank <= 10:
+            # Close to top: Show path to victory (include #1 through target + a bit below)
+            end_index = min(target_index + 2, len(items))  # Target + 1-2 below
+            return items[:end_index]
+
+        # Further back: Show local context (±2 around target)
         items_above = min(2, target_index)
         items_below = min(2, len(items) - target_index - 1)
-
-        # Adjust if we have room for more
-        total_context = items_above + 1 + items_below  # +1 for target
-        if total_context < max_items:
-            # Add more items above if possible
-            extra_above = min(max_items - total_context, target_index - items_above)
-            items_above += extra_above
-            total_context += extra_above
-
-            # Add more items below if still have room
-            if total_context < max_items:
-                extra_below = min(
-                    max_items - total_context, len(items) - target_index - 1 - items_below
-                )
-                items_below += extra_below
 
         start_index = target_index - items_above
         end_index = target_index + items_below + 1
