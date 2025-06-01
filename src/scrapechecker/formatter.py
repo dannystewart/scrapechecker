@@ -16,7 +16,7 @@ class Formatter:
         max_results: The maximum number of items to include in messages.
     """
 
-    def __init__(self, site_scraper: BaseScraper, max_results: int = 10) -> None:
+    def __init__(self, site_scraper: BaseScraper, max_results: int = 5) -> None:
         """Initialize the formatter."""
         self.site_scraper = site_scraper
         self.max_results = max_results
@@ -114,7 +114,7 @@ class Formatter:
 
             # Show what changed
             for field, (old_val, new_val) in changes.items():
-                message += f"  └ <b>{field}:</b> {old_val} → {new_val}\n"
+                message += f"    └ <b>{field}:</b> {old_val} → {new_val}\n"
 
         return message.rstrip()
 

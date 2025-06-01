@@ -90,7 +90,7 @@ def main() -> None:
             test_message += f"• {formatted}\n"
 
         monitor.send_telegram_alert(test_message)
-        print("Test notification sent!")
+        logger.info("Test notification sent!")
         return
 
     if args.send:
@@ -99,23 +99,22 @@ def main() -> None:
         if current_rankings:
             message = monitor.formatter.format_full_rankings(current_rankings)
             monitor.send_telegram_alert(message)
-            print(f"Current rankings sent! ({len(current_rankings)} contestants)")
+            logger.info("Current rankings sent! (%s contestants)", len(current_rankings))
         else:
-            print("No rankings found.")
+            logger.info("No rankings found.")
         return
 
     if args.replay:
         # Replay last detected changes for testing
         monitor.replay_last_changes()
-        print("Last detected changes replayed!")
         return
 
     # Run the monitoring
     try:
         monitor.monitor()
-        print("Contest monitoring completed successfully!")
+        logger.info("Contest monitoring completed successfully!")
     except Exception as e:
-        print(f"Error during contest monitoring: {e}")
+        logger.error("Error during contest monitoring: %s", e)
         sys.exit(1)
 
 
