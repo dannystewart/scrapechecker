@@ -70,8 +70,8 @@ class ChangeFinder:
         return new_items, removed_items, changed_items
 
     def _find_changed_items(
-        self, current_items: dict, previous_items: dict
-    ) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple]]]:
+        self, current_items: dict[str, Any], previous_items: dict[str, Any]
+    ) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]:
         """Find items that have changed between current and previous data."""
         changed_items = []
         for key, current_item in current_items.items():
@@ -82,7 +82,9 @@ class ChangeFinder:
                     changed_items.append((previous_item, current_item, changes))
         return changed_items
 
-    def _get_item_changes(self, old_item: dict, new_item: dict) -> dict[str, tuple[str, str]]:
+    def _get_item_changes(
+        self, old_item: dict[str, Any], new_item: dict[str, Any]
+    ) -> dict[str, tuple[str, str]]:
         """Get the changes between two versions of an item."""
         return {
             key: (old_item[key], new_item[key])

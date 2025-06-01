@@ -30,7 +30,7 @@ class Formatter:
         self,
         new_items: list[dict[str, Any]],
         removed_items: list[dict[str, Any]],
-        changed_items: list[tuple],
+        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
         current_items: list[dict[str, Any]] | None = None,
     ) -> str:
         """Format a message describing changes in items.
@@ -93,7 +93,9 @@ class Formatter:
 
         return message.rstrip()
 
-    def _format_changed_items(self, changed_items: list[tuple]) -> str:
+    def _format_changed_items(
+        self, changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]
+    ) -> str:
         """Format changed items section."""
         # Filter to relevant changes when we have a target
         if self.site_scraper.target_item:
@@ -195,7 +197,9 @@ class Formatter:
 
         return items[start_index:end_index]
 
-    def _get_focused_changes(self, changed_items: list[tuple]) -> list[tuple]:
+    def _get_focused_changes(
+        self, changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]
+    ) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]:
         """Get a focused view of changed items around the target contestant.
 
         Args:

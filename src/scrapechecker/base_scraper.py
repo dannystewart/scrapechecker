@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from polykit.log import PolyLog
+
+if TYPE_CHECKING:
+    from selenium.webdriver.firefox.webdriver import WebDriver
 
 
 class BaseScraper(ABC):
@@ -23,7 +26,7 @@ class BaseScraper(ABC):
         self.logger = PolyLog.get_logger()
 
     @abstractmethod
-    def extract_data(self, driver) -> list[dict[str, Any]]:
+    def extract_data(self, driver: WebDriver) -> list[dict[str, Any]]:
         """Extract data from the webpage using the provided driver.
 
         Args:

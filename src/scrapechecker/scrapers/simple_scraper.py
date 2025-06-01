@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from selenium.webdriver.common.by import By
 
 from scrapechecker.base_scraper import BaseScraper
+
+if TYPE_CHECKING:
+    from selenium.webdriver.firefox.webdriver import WebDriver
 
 
 class SimpleScraper(BaseScraper):
@@ -22,7 +25,7 @@ class SimpleScraper(BaseScraper):
         self.css_selector = css_selector
         self.attribute = attribute
 
-    def extract_data(self, driver) -> list[dict[str, Any]]:
+    def extract_data(self, driver: WebDriver) -> list[dict[str, Any]]:
         """Extract data from webpage using CSS selector."""
         elements = driver.find_elements(By.CSS_SELECTOR, self.css_selector)
 
@@ -58,7 +61,7 @@ class SimpleScraper(BaseScraper):
 class ProductScraper(BaseScraper):
     """Example scraper for monitoring product listings."""
 
-    def extract_data(self, driver) -> list[dict[str, Any]]:
+    def extract_data(self, driver: WebDriver) -> list[dict[str, Any]]:
         """Extract product data - customize this for your target site."""
         # Example: scrape product titles and prices
         products = []

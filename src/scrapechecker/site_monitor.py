@@ -218,7 +218,7 @@ class SiteMonitor:
         self,
         new_items: list[dict[str, Any]],
         removed_items: list[dict[str, Any]],
-        changed_items: list[tuple],
+        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
     ):
         """Update the daily status with new changes."""
         try:

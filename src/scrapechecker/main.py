@@ -50,7 +50,7 @@ def main():
     if args.scraper_type == "simple":
         scraper = SimpleScraper(css_selector=args.css_selector, attribute=args.attribute)
     elif args.scraper_type == "product":
-        scraper = ProductScraper()
+        scraper = ProductScraper(url=args.url)
     else:
         msg = f"Unknown scraper type: {args.scraper_type}"
         raise ValueError(msg)
