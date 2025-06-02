@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from polykit import PolyArgs
 
-from scrapechecker.scrapers.simple_scraper import ProductScraper, SimpleScraper
+from scrapechecker.example.simple_scraper import ProductScraper, SimpleScraper
 from scrapechecker.site_monitor import SiteMonitor
 
 if TYPE_CHECKING:

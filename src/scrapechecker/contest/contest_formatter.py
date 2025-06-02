@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
 
 
-class Formatter:
+class ContestFormatter:
     """Format display of items and change messages.
 
     Args:
