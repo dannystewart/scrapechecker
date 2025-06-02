@@ -53,7 +53,7 @@ class Formatter:
             message_parts.append(self._format_removed_items(removed_items))
 
         if changed_items:
-            message_parts.append(self._format_changed_items(changed_items))
+            message_parts.append(self._format_changed_items(changed_items, current_items))
 
         # Add current rankings section if we have current items and there were changes
         if current_items and (new_items or removed_items or changed_items):
@@ -94,12 +94,16 @@ class Formatter:
         return message.rstrip()
 
     def _format_changed_items(
-        self, changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]
+        self,
+        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
+        current_items: list[dict[str, Any]] | None = None,
     ) -> str:
         """Format changed items section."""
+        current_items = current_items or []
+
         # Filter to relevant changes when we have a target
         if self.site_scraper.target_item:
-            items_to_show = self._get_focused_changes(changed_items)
+            items_to_show = self._get_focused_changes(changed_items, current_items)
         else:
             items_to_show = changed_items[: self.max_results]
 
@@ -193,12 +197,15 @@ class Formatter:
         return items[start_index:end_index]
 
     def _get_focused_changes(
-        self, changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]
+        self,
+        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
+        current_items: list[dict[str, Any]],
     ) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]:
         """Get a focused view of changed items around the target contestant.
 
         Args:
             changed_items: All changed items.
+            current_items: All current items.
 
         Returns:
             A filtered list focusing on target contestant and nearby competitors.
@@ -208,42 +215,40 @@ class Formatter:
 
         target_name = self.site_scraper.target_item.lower()
         focused_items = []
-        target_old_rank = None
-        target_new_rank = None
 
-        # First pass: find target's old and new ranks
+        # Find target's current rank from current_items
+        target_current_rank = None
+        for item in current_items:
+            if "name" in item and target_name in item["name"].lower():
+                target_current_rank = item.get("rank")
+                break
+
+        if target_current_rank is None:
+            return changed_items[: self.max_results]
+
+        # Include target's changes if any
         for old_item, new_item, changes in changed_items:
             if "name" in new_item and target_name in new_item["name"].lower():
-                target_old_rank = old_item.get("rank")
-                target_new_rank = new_item.get("rank")
                 focused_items.append((old_item, new_item, changes))
                 break
 
-        # If no target found, return empty
-        if target_old_rank is None:
-            return focused_items
-
-        # Second pass: find competitors who directly threaten target's position
+        # Competitors who threaten target (moving above or getting stronger)
         for old_item, new_item, changes in changed_items:
             if "name" in new_item and target_name in new_item["name"].lower():
-                continue  # Skip target (already added)
+                continue  # Skip target (already handled)
 
             old_rank = old_item.get("rank")
             new_rank = new_item.get("rank")
 
-            # Only include competitors who directly threaten target by moving above them
-            if (
-                new_rank
-                and target_new_rank
-                and new_rank < target_new_rank  # Competitor is now ABOVE target (lower rank number)
-                and (
-                    # Competitor improved to threaten target's position
-                    old_rank is None  # New competitor
-                    or (
-                        old_rank and old_rank >= target_new_rank  # Moved above target from at/below
-                    )
-                )
-            ):
+            is_above_target = new_rank and target_current_rank and new_rank < target_current_rank
+            moved_above_target = old_rank is None or (old_rank and old_rank >= target_current_rank)
+            already_above_and_stronger = (
+                old_rank and old_rank < target_current_rank and "votes" in changes
+            )
+
+            should_include = is_above_target and (moved_above_target or already_above_and_stronger)
+
+            if should_include:
                 focused_items.append((old_item, new_item, changes))
 
         return focused_items
