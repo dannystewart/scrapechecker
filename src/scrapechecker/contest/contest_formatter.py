@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from scrapechecker.base_formatter import BaseFormatter
+
 if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
 
 
-class ContestFormatter:
+class ContestFormatter(BaseFormatter):
     """Format display of items and change messages.
 
     Args:
@@ -18,8 +20,7 @@ class ContestFormatter:
 
     def __init__(self, site_scraper: BaseScraper, max_results: int = 5) -> None:
         """Initialize the formatter."""
-        self.site_scraper = site_scraper
-        self.max_results = max_results
+        super().__init__(site_scraper, max_results)
 
     def display_item(self, item: dict[str, Any]) -> None:
         """Display an item's information."""
