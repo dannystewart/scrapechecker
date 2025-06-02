@@ -65,7 +65,9 @@ class ContestScraper(BaseScraper):
                         rank=rank,
                         name=name,
                         votes=votes,
-                        is_target=self.target_item and name.lower() == self.target_item.lower(),
+                        is_target=bool(
+                            self.target_item and name.lower() == self.target_item.lower()
+                        ),
                     )
                     contestants.append(contestant)
 
@@ -99,10 +101,13 @@ class ContestScraper(BaseScraper):
             votes = item.votes
             is_target = item.is_target
         else:
-            rank = item["rank"]
+            rank = item["rank"] or 0  # Default to 0 if None
             name = item["name"]
             votes = item["votes"]
             is_target = item.get("is_target", False)
+
+        # Ensure rank is never None
+        rank = rank or 0
 
         rank_emoji = self._get_rank_emoji(rank)
         target_indicator = " 🎯" if is_target else ""

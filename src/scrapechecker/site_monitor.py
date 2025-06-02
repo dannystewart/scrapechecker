@@ -16,6 +16,7 @@ from scrapechecker.web_scraper import WebScraper
 if TYPE_CHECKING:
     from scrapechecker.base_formatter import BaseFormatter
     from scrapechecker.base_scraper import BaseScraper
+    from scrapechecker.types import ItemChange
 
 
 class SiteMonitor:
@@ -219,9 +220,9 @@ class SiteMonitor:
 
     def update_daily_status(
         self,
-        new_items: list[dict[str, Any]],
-        removed_items: list[dict[str, Any]],
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
+        new_items: list[Any],
+        removed_items: list[Any],
+        changed_items: list[ItemChange],
     ):
         """Update the daily status with new changes."""
         try:
@@ -252,12 +253,21 @@ class SiteMonitor:
         if sample_data is None:
             sample_data = [{"test": "data", "id": "1"}, {"test": "data", "id": "2"}]
 
-        # Create sample changes
+        # Import ItemChange for runtime usage
+        from scrapechecker.types import FieldChange, ItemChange
+
+        # Create sample changes using ItemChange objects
         new_items = sample_data[:1]
         removed_items = [{"test": "removed", "id": "3"}]
-        changed_items = [
-            ({"test": "old", "id": "2"}, {"test": "new", "id": "2"}, {"test": ("old", "new")})
-        ]
+
+        # Create a sample ItemChange object
+        old_item = {"test": "old", "id": "2"}
+        new_item = {"test": "new", "id": "2"}
+        field_change = FieldChange(field_name="test", old_value="old", new_value="new")
+        item_change = ItemChange(
+            old_item=old_item, new_item=new_item, changes={"test": field_change}
+        )
+        changed_items = [item_change]
 
         # Format and send the test message
         message = self.formatter.format_changes_message(

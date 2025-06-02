@@ -65,7 +65,7 @@ class WebScraper:
             except Exception as e:
                 self.logger.error("Error closing driver: %s", str(e))
 
-    def scrape_data(self) -> list[dict[str, Any]]:
+    def scrape_data(self) -> list[Any]:
         """Scrape data using the site-specific scraper."""
         try:
             with self.managed_driver() as driver:

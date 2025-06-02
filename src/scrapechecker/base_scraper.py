@@ -47,7 +47,7 @@ class BaseScraper(ABC):
             A unique string identifier for the item.
         """
 
-    def filter_items(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def filter_items(self, items: list[Any]) -> list[Any]:
         """Filter items based on criteria. Override if needed.
 
         Args:
