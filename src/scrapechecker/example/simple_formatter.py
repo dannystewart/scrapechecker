@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from scrapechecker.base_formatter import BaseFormatter
+
+if TYPE_CHECKING:
+    from scrapechecker.types import ItemChange  # noqa: F401
 
 
 class SimpleFormatter(BaseFormatter):
@@ -23,8 +26,8 @@ class SimpleFormatter(BaseFormatter):
         self,
         new_items: list[dict[str, Any]],
         removed_items: list[dict[str, Any]],
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-        current_items: list[dict[str, Any]] | None = None,
+        changed_items: list[ItemChange],
+        current_items: list[dict[str, Any]] | None = None,  # noqa: F841
     ) -> str:
         """Format a simple message describing changes in items."""
         message_parts = []
@@ -74,7 +77,7 @@ class SimpleFormatter(BaseFormatter):
 
     def _format_changed_items(
         self,
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
+        changed_items: list[ItemChange],
         current_items: list[dict[str, Any]] | None = None,  # noqa: ARG002
     ) -> str:
         """Format changed items section."""
@@ -83,13 +86,13 @@ class SimpleFormatter(BaseFormatter):
 
         message = f"🔄 {count} Changed Item{'s' if count != 1 else ''}:\n"
 
-        for _old_item, new_item, changes in items_to_show:
-            formatted = self.site_scraper.format_item(new_item)
+        for item_change in items_to_show:
+            formatted = self.site_scraper.format_item(item_change.new_item)
             message += f"• {formatted}\n"
 
             # Show what changed
-            for field, (old_val, new_val) in changes.items():
-                message += f"    └ {field}: {old_val} → {new_val}\n"
+            for field_change in item_change.changes.values():
+                message += f"    └ {field_change.field_name}: {field_change.old_value} → {field_change.new_value}\n"
 
         if count > self.max_results:
             message += f"... and {count - self.max_results} more\n"

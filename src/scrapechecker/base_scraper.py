@@ -58,11 +58,11 @@ class BaseScraper(ABC):
         """
         return items
 
-    def format_item(self, item: dict[str, Any]) -> str:
+    def format_item(self, item: Any) -> str:
         """Format an item for display. Override for custom formatting.
 
         Args:
-            item: The data item dictionary.
+            item: The data item (dict, dataclass, or other type).
 
         Returns:
             The formatted string representation of the item.

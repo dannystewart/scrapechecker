@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from polykit import PolyArgs, PolyEnv, PolyLog, PolyPath
 
 from scrapechecker.contest.contest_scraper import ContestScraper
+from scrapechecker.contest.contest_formatter import ContestFormatter
 from scrapechecker.site_monitor import SiteMonitor
 
 if TYPE_CHECKING:
@@ -57,10 +58,14 @@ def main() -> None:
     # Create the contest scraper
     scraper = ContestScraper(url=args.url, target_item=args.target)
 
+    # Create the contest formatter
+    formatter = ContestFormatter(scraper)
+
     # Create the site monitor
     monitor = SiteMonitor(
         url=args.url,
         site_scraper=scraper,
+        formatter=formatter,
         data_file=data_file,
         status_file=status_file,
     )
@@ -97,7 +102,8 @@ def main() -> None:
         # Send current rankings without change tracking
         current_rankings = monitor.scraper.scrape_data()
         if current_rankings:
-            message = monitor.formatter.format_full_rankings(current_rankings)
+            # Use the original formatter reference (we know it's ContestFormatter)
+            message = formatter.format_full_rankings(current_rankings)
             monitor.send_telegram_alert(message)
             logger.info("Current rankings sent! (%s contestants)", len(current_rankings))
         else:

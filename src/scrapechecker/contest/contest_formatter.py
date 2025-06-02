@@ -8,6 +8,8 @@ from scrapechecker.base_formatter import BaseFormatter
 
 if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
+    from scrapechecker.contest.contest_types import ContestItem
+    from scrapechecker.types import ItemChange
 
 
 class ContestFormatter(BaseFormatter):
@@ -22,24 +24,24 @@ class ContestFormatter(BaseFormatter):
         """Initialize the formatter."""
         super().__init__(site_scraper, max_results)
 
-    def display_item(self, item: dict[str, Any]) -> None:
+    def display_item(self, item: ContestItem) -> None:
         """Display an item's information."""
         formatted = self.site_scraper.format_item(item)
-        print(formatted)
+        print(f"• {formatted}")
 
     def format_changes_message(
         self,
-        new_items: list[dict[str, Any]],
-        removed_items: list[dict[str, Any]],
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-        current_items: list[dict[str, Any]] | None = None,
+        new_items: list[ContestItem],
+        removed_items: list[ContestItem],
+        changed_items: list[ItemChange],
+        current_items: list[ContestItem] | None = None,
     ) -> str:
         """Format a message describing changes in items.
 
         Args:
             new_items: The list of new items.
             removed_items: The list of removed items.
-            changed_items: The list of (old_item, new_item, changes) tuples.
+            changed_items: The list of ItemChange objects.
             current_items: Optional current state of all items to show at the end.
 
         Returns:
@@ -62,7 +64,7 @@ class ContestFormatter(BaseFormatter):
 
         return "\n\n".join(message_parts) if message_parts else "No changes detected."
 
-    def _format_new_items(self, new_items: list[dict[str, Any]]) -> str:
+    def _format_new_items(self, new_items: list[ContestItem]) -> str:
         """Format new items section."""
         count = len(new_items)
         items_to_show = new_items[: self.max_results]
@@ -78,7 +80,7 @@ class ContestFormatter(BaseFormatter):
 
         return message.rstrip()
 
-    def _format_removed_items(self, removed_items: list[dict[str, Any]]) -> str:
+    def _format_removed_items(self, removed_items: list[ContestItem]) -> str:
         """Format removed items section."""
         count = len(removed_items)
         items_to_show = removed_items[: self.max_results]
@@ -95,9 +97,7 @@ class ContestFormatter(BaseFormatter):
         return message.rstrip()
 
     def _format_changed_items(
-        self,
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-        current_items: list[dict[str, Any]] | None = None,
+        self, changed_items: list[ItemChange], current_items: list[ContestItem] | None = None
     ) -> str:
         """Format changed items section."""
         current_items = current_items or []
@@ -115,17 +115,17 @@ class ContestFormatter(BaseFormatter):
             f"<b>🔄 {len(items_to_show)} Key Change{'s' if len(items_to_show) != 1 else ''}:</b>\n"
         )
 
-        for _old_item, new_item, changes in items_to_show:
-            formatted = self.site_scraper.format_item(new_item)
+        for item_change in items_to_show:
+            formatted = self.site_scraper.format_item(item_change.new_item)
             message += f"• {formatted}\n"
 
             # Show what changed
-            for field, (old_val, new_val) in changes.items():
-                message += f"    └ <b>{field}:</b> {old_val} → {new_val}\n"
+            for field_change in item_change.changes.values():
+                message += f"    └ <b>{field_change.field_name}:</b> {field_change.old_value} → {field_change.new_value}\n"
 
         return message.rstrip()
 
-    def _format_current_rankings(self, current_items: list[dict[str, Any]]) -> str:
+    def _format_current_rankings(self, current_items: list[ContestItem]) -> str:
         """Format current rankings section."""
         count = len(current_items)
 
@@ -151,8 +151,8 @@ class ContestFormatter(BaseFormatter):
         return message.rstrip()
 
     def _get_focused_rankings(
-        self, items: list[dict[str, Any]], max_items: int = 7
-    ) -> list[dict[str, Any]]:
+        self, items: list[ContestItem], max_items: int = 7
+    ) -> list[ContestItem]:
         """Get a focused view of rankings with adaptive strategy.
 
         When target is close to top (within 10 spots): Show path to #1
@@ -174,9 +174,12 @@ class ContestFormatter(BaseFormatter):
 
         # Find the target contestant
         for i, item in enumerate(items):
-            if "name" in item and target_name in item["name"].lower():
+            item_name = self._get_item_name(item)
+            if target_name in item_name.lower():
                 target_index = i
-                target_rank = item.get("rank", i + 1)  # Use rank or position as fallback
+                target_rank = self._get_item_rank(item) or (
+                    i + 1
+                )  # Use rank or position as fallback
                 break
 
         if target_index is None:  # Target not found, return top items
@@ -197,11 +200,21 @@ class ContestFormatter(BaseFormatter):
 
         return items[start_index:end_index]
 
+    def _get_item_name(self, item: ContestItem | dict[str, Any]) -> str:
+        """Get name from either ContestItem or dict."""
+        if isinstance(item, dict):
+            return item.get("name", "")
+        return item.name
+
+    def _get_item_rank(self, item: ContestItem | dict[str, Any]) -> int | None:
+        """Get rank from either ContestItem or dict."""
+        if isinstance(item, dict):
+            return item.get("rank")
+        return item.rank
+
     def _get_focused_changes(
-        self,
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-        current_items: list[dict[str, Any]],
-    ) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]:
+        self, changed_items: list[ItemChange], current_items: list[ContestItem]
+    ) -> list[ItemChange]:
         """Get a focused view of changed items around the target contestant.
 
         Args:
@@ -220,41 +233,44 @@ class ContestFormatter(BaseFormatter):
         # Find target's current rank from current_items
         target_current_rank = None
         for item in current_items:
-            if "name" in item and target_name in item["name"].lower():
-                target_current_rank = item.get("rank")
+            item_name = self._get_item_name(item)
+            if target_name in item_name.lower():
+                target_current_rank = self._get_item_rank(item)
                 break
 
         if target_current_rank is None:
             return changed_items[: self.max_results]
 
         # Include target's changes if any
-        for old_item, new_item, changes in changed_items:
-            if "name" in new_item and target_name in new_item["name"].lower():
-                focused_items.append((old_item, new_item, changes))
+        for item_change in changed_items:
+            item_name = self._get_item_name(item_change.new_item)
+            if target_name in item_name.lower():
+                focused_items.append(item_change)
                 break
 
         # Competitors who threaten target (moving above or getting stronger)
-        for old_item, new_item, changes in changed_items:
-            if "name" in new_item and target_name in new_item["name"].lower():
+        for item_change in changed_items:
+            item_name = self._get_item_name(item_change.new_item)
+            if target_name in item_name.lower():
                 continue  # Skip target (already handled)
 
-            old_rank = old_item.get("rank")
-            new_rank = new_item.get("rank")
+            old_rank = self._get_item_rank(item_change.old_item)
+            new_rank = self._get_item_rank(item_change.new_item)
 
             is_above_target = new_rank and target_current_rank and new_rank < target_current_rank
             moved_above_target = old_rank is None or (old_rank and old_rank >= target_current_rank)
             already_above_and_stronger = (
-                old_rank and old_rank < target_current_rank and "votes" in changes
+                old_rank and old_rank < target_current_rank and "votes" in item_change.changes
             )
 
             should_include = is_above_target and (moved_above_target or already_above_and_stronger)
 
             if should_include:
-                focused_items.append((old_item, new_item, changes))
+                focused_items.append(item_change)
 
         return focused_items
 
-    def format_full_rankings(self, current_items: list[dict[str, Any]]) -> str:
+    def format_full_rankings(self, current_items: list[ContestItem]) -> str:
         """Format full rankings without filtering (used for --send command)."""
         count = len(current_items)
         items_to_show = current_items[: self.max_results]

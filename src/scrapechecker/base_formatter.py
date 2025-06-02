@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
+    from scrapechecker.types import ItemChange
 
 
 class BaseFormatter(ABC):
@@ -27,7 +28,7 @@ class BaseFormatter(ABC):
         self,
         new_items: list[dict[str, Any]],
         removed_items: list[dict[str, Any]],
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
+        changed_items: list[ItemChange],
         current_items: list[dict[str, Any]] | None = None,
     ) -> str:
         """Format a message describing changes in items.
@@ -35,7 +36,7 @@ class BaseFormatter(ABC):
         Args:
             new_items: The list of new items.
             removed_items: The list of removed items.
-            changed_items: The list of (old_item, new_item, changes) tuples.
+            changed_items: The list of ItemChange objects.
             current_items: Optional current state of all items to show at the end.
 
         Returns:
@@ -44,7 +45,7 @@ class BaseFormatter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def display_item(self, item: dict[str, Any]) -> None:
+    def display_item(self, item: Any) -> None:
         """Display a single item to the console.
 
         Args:

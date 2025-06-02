@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from polykit.log import PolyLog
 
+from scrapechecker.types import FieldChange, ItemChange
+
 if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
 
@@ -27,11 +29,7 @@ class ChangeFinder:
 
     def find_changes(
         self, current_items: list[dict[str, Any]], previous_items: list[dict[str, Any]]
-    ) -> tuple[
-        list[dict[str, Any]],
-        list[dict[str, Any]],
-        list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-    ]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[ItemChange]]:
         """Find new, removed, and changed items.
 
         Args:
@@ -71,7 +69,7 @@ class ChangeFinder:
 
     def _find_changed_items(
         self, current_items: dict[str, Any], previous_items: dict[str, Any]
-    ) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]]:
+    ) -> list[ItemChange]:
         """Find items that have changed between current and previous data."""
         changed_items = []
         for key, current_item in current_items.items():
@@ -79,29 +77,30 @@ class ChangeFinder:
                 previous_item = previous_items[key]
                 changes = self._get_item_changes(previous_item, current_item)
                 if changes:
-                    changed_items.append((previous_item, current_item, changes))
+                    item_change = ItemChange(
+                        old_item=previous_item, new_item=current_item, changes=changes
+                    )
+                    changed_items.append(item_change)
         return changed_items
 
     def _get_item_changes(
         self, old_item: dict[str, Any], new_item: dict[str, Any]
-    ) -> dict[str, tuple[str, str]]:
+    ) -> dict[str, FieldChange]:
         """Get the changes between two versions of an item."""
-        return {
-            key: (old_item[key], new_item[key])
-            for key in old_item
-            if key in new_item and old_item[key] != new_item[key] and key not in self.ignored_fields
-        }
+        changes = {}
+        for key, old_value in old_item.items():
+            if key in new_item and old_value != new_item[key] and key not in self.ignored_fields:
+                changes[key] = FieldChange(
+                    field_name=key, old_value=str(old_value), new_value=str(new_item[key])
+                )
+        return changes
 
     def filter_to_target_only(
         self,
         new_items: list[dict[str, Any]],
         removed_items: list[dict[str, Any]],
-        changed_items: list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-    ) -> tuple[
-        list[dict[str, Any]],
-        list[dict[str, Any]],
-        list[tuple[dict[str, Any], dict[str, Any], dict[str, tuple[str, str]]]],
-    ]:
+        changed_items: list[ItemChange],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[ItemChange]]:
         """Filter changes to only include the target contestant.
 
         Args:
@@ -124,9 +123,7 @@ class ChangeFinder:
         filtered_new = [item for item in new_items if is_target_item(item)]
         filtered_removed = [item for item in removed_items if is_target_item(item)]
         filtered_changed = [
-            (old_item, new_item, changes)
-            for old_item, new_item, changes in changed_items
-            if is_target_item(new_item)
+            item_change for item_change in changed_items if is_target_item(item_change.new_item)
         ]
 
         return filtered_new, filtered_removed, filtered_changed

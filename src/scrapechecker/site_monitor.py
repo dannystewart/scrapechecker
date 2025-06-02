@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any
 from polykit import TZ, PolyEnv, PolyLog
 
 from scrapechecker.change_finder import ChangeFinder
-from scrapechecker.contest.contest_formatter import ContestFormatter
 from scrapechecker.telegram import TelegramSender
 from scrapechecker.web_scraper import WebScraper
 
 if TYPE_CHECKING:
+    from scrapechecker.base_formatter import BaseFormatter
     from scrapechecker.base_scraper import BaseScraper
 
 
@@ -24,6 +24,7 @@ class SiteMonitor:
     Args:
         url: The URL to monitor.
         site_scraper: The site-specific scraper implementation.
+        formatter: The formatter for displaying items and changes.
         enable_telegram: Whether to enable Telegram notifications.
         data_file: File to store monitoring data.
         status_file: File to store daily status.
@@ -33,6 +34,7 @@ class SiteMonitor:
         self,
         url: str,
         site_scraper: BaseScraper,
+        formatter: BaseFormatter,
         enable_telegram: bool = True,
         data_file: str = "monitoring_data.json",
         status_file: str = "daily_status.json",
@@ -42,6 +44,7 @@ class SiteMonitor:
         self.env = PolyEnv()
         self.url = url
         self.site_scraper = site_scraper
+        self.formatter = formatter
         self.data_file = data_file
         self.status_file = status_file
 
@@ -55,7 +58,6 @@ class SiteMonitor:
 
         # Initialize components
         self.scraper = WebScraper(url, site_scraper)
-        self.formatter = ContestFormatter(site_scraper)
         self.change_finder = ChangeFinder(site_scraper)
 
     def monitor(self) -> None:

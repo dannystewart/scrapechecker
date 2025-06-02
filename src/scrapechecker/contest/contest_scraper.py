@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from operator import itemgetter
 from typing import TYPE_CHECKING, Any
 
 from selenium.webdriver.common.by import By
@@ -10,6 +9,7 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.support.ui import WebDriverWait
 
 from scrapechecker.base_scraper import BaseScraper
+from scrapechecker.contest.contest_types import ContestItem
 
 if TYPE_CHECKING:
     from selenium.webdriver.firefox.webdriver import WebDriver
@@ -29,7 +29,7 @@ class ContestScraper(BaseScraper):
         """Initialize the contest scraper."""
         super().__init__(url, target_item)
 
-    def extract_data(self, driver: WebDriver) -> list[dict[str, Any]]:
+    def extract_data(self, driver: WebDriver) -> list[ContestItem]:
         """Extract contestant data from the contest page."""
         contestants = []
 
@@ -61,12 +61,12 @@ class ContestScraper(BaseScraper):
                     # Extract number from "150 Votes" format
                     votes = int(votes_text.split()[0])
 
-                    contestant = {
-                        "rank": rank,
-                        "name": name,
-                        "votes": votes,
-                        "is_target": self.target_item and name.lower() == self.target_item.lower(),
-                    }
+                    contestant = ContestItem(
+                        rank=rank,
+                        name=name,
+                        votes=votes,
+                        is_target=self.target_item and name.lower() == self.target_item.lower(),
+                    )
                     contestants.append(contestant)
 
                 except Exception as e:
@@ -74,7 +74,7 @@ class ContestScraper(BaseScraper):
                     continue
 
             # Sort by rank to ensure consistent ordering
-            contestants.sort(key=itemgetter("rank"))
+            contestants.sort(key=lambda x: x.rank)
 
         except Exception as e:
             self.logger.error("Error extracting contest data: %s", e)
@@ -82,20 +82,32 @@ class ContestScraper(BaseScraper):
 
         return contestants
 
-    def get_item_key(self, item: dict[str, Any]) -> str:
+    def get_item_key(self, item: ContestItem | dict[str, Any]) -> str:
         """Generate unique key for each contestant."""
-        return f"contestant_{item['name'].lower().replace(' ', '_')}"
+        name = item.name if isinstance(item, ContestItem) else item["name"]
+        return f"contestant_{name.lower().replace(' ', '_')}"
 
-    def filter_items(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def filter_items(self, items: list[ContestItem]) -> list[ContestItem]:
         """Optional filtering - return all contestants by default."""
         return items
 
-    def format_item(self, item: dict[str, Any]) -> str:
+    def format_item(self, item: ContestItem | dict[str, Any]) -> str:
         """Format a contestant for display."""
-        rank_emoji = self._get_rank_emoji(item["rank"])
-        target_indicator = " 🎯" if item.get("is_target") else ""
+        if isinstance(item, ContestItem):
+            rank = item.rank
+            name = item.name
+            votes = item.votes
+            is_target = item.is_target
+        else:
+            rank = item["rank"]
+            name = item["name"]
+            votes = item["votes"]
+            is_target = item.get("is_target", False)
 
-        return f"{rank_emoji} {item['rank']}. <b>{item['name']}</b> ({item['votes']} votes{target_indicator})"
+        rank_emoji = self._get_rank_emoji(rank)
+        target_indicator = " 🎯" if is_target else ""
+
+        return f"{rank_emoji} {rank}. <b>{name}</b> ({votes} votes{target_indicator})"
 
     def _get_rank_emoji(self, rank: int) -> str:
         """Get emoji for ranking position."""
