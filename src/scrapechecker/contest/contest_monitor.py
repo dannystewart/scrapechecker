@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 
 from polykit import PolyArgs, PolyEnv, PolyLog, PolyPath
 
-from scrapechecker.contest.contest_scraper import ContestScraper
 from scrapechecker.contest.contest_formatter import ContestFormatter
+from scrapechecker.contest.contest_scraper import ContestScraper
 from scrapechecker.site_monitor import SiteMonitor
 
 if TYPE_CHECKING:
