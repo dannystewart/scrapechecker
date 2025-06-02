@@ -66,8 +66,16 @@ class SiteMonitor:
         current_items = self.scraper.scrape_data()
         previous_items = self.load_previous_data()
 
+        # Convert current items to dicts for ChangeFinder (if they're dataclass objects)
+        current_data = []
+        for item in current_items:
+            if hasattr(item, 'to_dict'):
+                current_data.append(item.to_dict())
+            else:
+                current_data.append(item)
+
         new_items, removed_items, changed_items = self.change_finder.find_changes(
-            current_items, previous_items
+            current_data, previous_items
         )
 
         # Update daily status
@@ -95,8 +103,8 @@ class SiteMonitor:
             for item in current_items:
                 self.formatter.display_item(item)
 
-        # Save current data
-        self.save_current_data(current_items)
+        # Save current data (use converted dict format for JSON serialization)
+        self.save_current_data(current_data)
 
         # Send daily status update (will only send on first run of the day)
         self.send_daily_status(len(current_items))
