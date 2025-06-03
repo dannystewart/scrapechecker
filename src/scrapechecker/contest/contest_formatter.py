@@ -257,12 +257,18 @@ class ContestFormatter(BaseFormatter):
             old_rank = self._get_item_rank(item_change.old_item)
             new_rank = self._get_item_rank(item_change.new_item)
 
-            is_above_target = new_rank and target_current_rank and new_rank < target_current_rank
-            moved_above_target = old_rank is None or (old_rank and old_rank >= target_current_rank)
+            is_above_target = (
+                new_rank and target_current_rank and new_rank < target_current_rank
+            )
+            moved_above_target = (
+                old_rank and target_current_rank and new_rank and
+                old_rank >= target_current_rank and new_rank < target_current_rank
+            )
             already_above_and_stronger = (
                 old_rank and old_rank < target_current_rank and "votes" in item_change.changes
             )
 
+            # Only include if currently above target AND (moved above OR got stronger)
             should_include = is_above_target and (moved_above_target or already_above_and_stronger)
 
             if should_include:
