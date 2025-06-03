@@ -54,14 +54,13 @@ class TelegramSender:
             msg = f"Request to Telegram API failed: {e}"
             raise Exception(msg) from e
 
-    def send_message(self, message: str, parse_mode: str | None = None, log: bool = False) -> bool:
+    def send_message(self, message: str, parse_mode: str = "HTML", log: bool = False) -> bool:
         """Send a message to all configured Telegram users.
 
         Args:
             message: The message to send.
             parse_mode: The parse mode to use for message formatting. Supports "Markdown",
-                        "MarkdownV2", or "HTML". Defaults to None, in which case parse_mode won't
-                        be included in the payload at all.
+                        "MarkdownV2", or "HTML". Defaults to "HTML".
             log: Whether to log a successful send. Defaults to False.
 
         Returns:

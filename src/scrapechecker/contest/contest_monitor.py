@@ -70,7 +70,12 @@ def main() -> None:
 
     if args.previous:
         # Replay last detected changes for testing
-        monitor.replay_last_changes()
+        message = monitor.replay_last_changes()
+        if message:
+            monitor.send_telegram_alert(message)
+            logger.info("Previous changes replayed and sent via Telegram!")
+        else:
+            logger.info("No previous changes to replay.")
         return
 
     # Run the monitoring
