@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from polykit import PolyArgs, PolyEnv, PolyLog, PolyPath
@@ -23,23 +24,17 @@ env.add_var("CONTEST_URL")
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = PolyArgs(description="Monitor pet contest rankings and votes")
-    parser.add_argument("url", nargs="?", default=env.contest_url, help="Contest URL to monitor")
+    parser = PolyArgs(description="Monitor Roo's pet contest rankings and votes", min_arg_width=24)
     parser.add_argument(
-        "--target",
-        type=str,
-        help="Name of specific contestant to highlight and focus monitoring on",
-    )
-    parser.add_argument("--test-alert", action="store_true", help="Send a test notification")
-    parser.add_argument("--send", action="store_true", help="Send current rankings")
-    parser.add_argument(
-        "--replay", action="store_true", help="Replay last detected changes for testing"
+        "--current",
+        action="store_true",
+        help="Show current status with change detection but don't save data",
     )
     parser.add_argument(
-        "--data-file", help="File to store contest data (default: user data directory)"
+        "--previous", action="store_true", help="replay last detected changes for testing"
     )
     parser.add_argument(
-        "--status-file", help="File to store daily status (default: user data directory)"
+        "--data-dir", help="directory to store contest data (default: user data directory)"
     )
     return parser.parse_args()
 
@@ -51,66 +46,38 @@ def main() -> None:
     # Initialize PolyPath for standardized file storage
     paths = PolyPath("scrapechecker")
 
-    # Set default file paths using PolyPath if not provided
-    data_file = args.data_file or str(paths.from_data("contest_data.json"))
-    status_file = args.status_file or str(paths.from_data("contest_status.json"))
+    # Set default data directory using PolyPath if not provided
+    if args.data_dir:
+        data_file = str(Path(args.data_dir) / "contest_data.json")
+        status_file = str(Path(args.data_dir) / "contest_status.json")
+    else:
+        data_file = str(paths.from_data("contest_data.json"))
+        status_file = str(paths.from_data("contest_status.json"))
+
+    # Set the URL
+    url = env.contest_url
 
     # Create the contest scraper
-    scraper = ContestScraper(url=args.url, target_item=args.target)
+    scraper = ContestScraper(url=url, target_item="roo")
 
     # Create the contest formatter
     formatter = ContestFormatter(scraper)
 
     # Create the site monitor
     monitor = SiteMonitor(
-        url=args.url,
+        url=url,
         site_scraper=scraper,
         formatter=formatter,
         data_file=data_file,
         status_file=status_file,
     )
 
-    if args.test_alert:
-        # Send test notification with sample contest data
-        sample_data = [
-            {
-                "rank": 1,
-                "name": "Roo",
-                "votes": 150,
-                "is_target": args.target and "roo" in args.target.lower(),
-            },
-            {
-                "rank": 2,
-                "name": "Johnny",
-                "votes": 140,
-                "is_target": False,
-            },
-        ]
-
-        # Send test alert with formatted message instead of using the generic test method
-        test_message = "<b>--- TEST CONTEST NOTIFICATION ---</b>\n\n"
-        test_message += "<b>🆕 Current Rankings:</b>\n"
-        for item in sample_data:
-            formatted = scraper.format_item(item)
-            test_message += f"• {formatted}\n"
-
-        monitor.send_telegram_alert(test_message)
-        logger.info("Test notification sent!")
+    if args.current:
+        # Check current status with change detection but don't save data
+        monitor.check_current_status()
         return
 
-    if args.send:
-        # Send current rankings without change tracking
-        current_rankings = monitor.scraper.scrape_data()
-        if current_rankings:
-            # Use the original formatter reference (we know it's ContestFormatter)
-            message = formatter.format_full_rankings(current_rankings)
-            monitor.send_telegram_alert(message)
-            logger.info("Current rankings sent! (%s contestants)", len(current_rankings))
-        else:
-            logger.info("No rankings found.")
-        return
-
-    if args.replay:
+    if args.previous:
         # Replay last detected changes for testing
         monitor.replay_last_changes()
         return

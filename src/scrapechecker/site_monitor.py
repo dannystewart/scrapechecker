@@ -63,6 +63,38 @@ class SiteMonitor[ItemType]:
         self.scraper = WebScraper(url, site_scraper)
         self.change_finder = ChangeFinder(site_scraper)
 
+    def check_current_status(self) -> None:
+        """Check current status with change detection but don't save data (for testing)."""
+        current_items = self.scraper.scrape_data()
+        previous_items = self.load_previous_data()
+
+        # Convert current items to dicts for ChangeFinder (if they're dataclass objects)
+        current_data = []
+        for item in current_items:
+            if hasattr(item, "to_dict"):
+                current_data.append(item.to_dict())
+            else:
+                current_data.append(item)
+
+        new_items, removed_items, changed_items = self.change_finder.find_changes(
+            current_data, previous_items
+        )
+
+        # Send notifications if there are any changes (focused filtering applied in formatter)
+        if new_items or removed_items or changed_items:
+            message = self.formatter.format_changes_message(
+                new_items, removed_items, changed_items, current_data
+            )
+
+            # Only send if the formatted message has actual content
+            if message and "Key Change" in message:
+                self.send_telegram_alert(message)
+                self.logger.info("Current status sent with change detection!")
+            else:
+                self.logger.info("No relevant changes detected for notifications.")
+        else:
+            self.logger.info("No changes detected between current and saved data.")
+
     def monitor(self) -> None:
         """Run the monitoring process."""
         current_items = self.scraper.scrape_data()
