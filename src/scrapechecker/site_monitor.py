@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from polykit import TZ, PolyEnv, PolyLog
+from polykit import PolyEnv, PolyLog
 
 from scrapechecker.change_finder import ChangeFinder
 from scrapechecker.telegram import TelegramSender
@@ -16,7 +16,6 @@ from scrapechecker.web_scraper import WebScraper
 if TYPE_CHECKING:
     from scrapechecker.base_formatter import BaseFormatter
     from scrapechecker.base_scraper import BaseScraper
-    from scrapechecker.types import ItemChange
 
 ItemType = TypeVar("ItemType")
 
@@ -24,13 +23,15 @@ ItemType = TypeVar("ItemType")
 class SiteMonitor[ItemType]:
     """Generic site monitoring framework.
 
+    This class provides a generic framework for monitoring websites for changes.
+    It can be used with any scraper and formatter implementation.
+
     Args:
         url: The URL to monitor.
-        site_scraper: The site-specific scraper implementation.
+        site_scraper: The scraper for extracting data from the site.
         formatter: The formatter for displaying items and changes.
         enable_telegram: Whether to enable Telegram notifications.
         data_file: File to store monitoring data.
-        status_file: File to store daily status.
     """
 
     def __init__(
@@ -40,7 +41,6 @@ class SiteMonitor[ItemType]:
         formatter: BaseFormatter[ItemType],
         enable_telegram: bool = True,
         data_file: str = "monitoring_data.json",
-        status_file: str = "daily_status.json",
     ) -> None:
         """Initialize the site monitor."""
         self.logger = PolyLog.get_logger()
@@ -49,33 +49,33 @@ class SiteMonitor[ItemType]:
         self.site_scraper = site_scraper
         self.formatter = formatter
         self.data_file = data_file
-        self.status_file = status_file
 
         # Configure environment variables for Telegram
         self.env.add_var("TELEGRAM_API_TOKEN")
         self.env.add_var("TELEGRAM_CHAT_ID")
 
+        # Initialize components
+        self.change_finder = ChangeFinder(site_scraper)
+        self.web_scraper = WebScraper(url, site_scraper)
+
         # Configure Telegram if enabled
         if enable_telegram:
             self._configure_telegram()
 
-        # Initialize components
-        self.scraper = WebScraper(url, site_scraper)
-        self.change_finder = ChangeFinder(site_scraper)
-
     def check_current_status(self) -> None:
-        """Check current status with change detection but don't save data (for testing)."""
-        current_items = self.scraper.scrape_data()
+        """Check current status with change detection but don't save data."""
+        self.logger.info("Checking current status with change detection...")
+
+        # Get current data using WebScraper
+        current_items = self.web_scraper.scrape_data()
         previous_items = self.load_previous_data()
 
-        # Convert current items to dicts for ChangeFinder (if they're dataclass objects)
-        current_data = []
-        for item in current_items:
-            if hasattr(item, "to_dict"):
-                current_data.append(item.to_dict())
-            else:
-                current_data.append(item)
+        # Convert items to dict format for change detection
+        current_data = [
+            item.to_dict() if hasattr(item, "to_dict") else item for item in current_items
+        ]
 
+        # Find changes
         new_items, removed_items, changed_items = self.change_finder.find_changes(
             current_data, previous_items
         )
@@ -85,8 +85,6 @@ class SiteMonitor[ItemType]:
             message = self.formatter.format_changes_message(
                 new_items, removed_items, changed_items, current_data
             )
-
-            # Only send if the formatted message has actual content
             if message and "Key Change" in message:
                 self.send_telegram_alert(message)
                 self.logger.info("Current status sent with change detection!")
@@ -96,100 +94,82 @@ class SiteMonitor[ItemType]:
             self.logger.info("No changes detected between current and saved data.")
 
     def monitor(self) -> None:
-        """Run the monitoring process."""
-        current_items = self.scraper.scrape_data()
+        """Monitor the site for changes and send notifications."""
+        self.logger.info("Starting monitoring for %s", self.url)
+
+        # Get current data using WebScraper
+        current_items = self.web_scraper.scrape_data()
         previous_items = self.load_previous_data()
 
-        # Convert current items to dicts for ChangeFinder (if they're dataclass objects)
-        current_data = []
-        for item in current_items:
-            if hasattr(item, "to_dict"):
-                current_data.append(item.to_dict())
-            else:
-                current_data.append(item)
+        # Convert items to dict format for change detection
+        current_data = [
+            item.to_dict() if hasattr(item, "to_dict") else item for item in current_items
+        ]
 
+        # Find changes
         new_items, removed_items, changed_items = self.change_finder.find_changes(
             current_data, previous_items
         )
-
-        # Update daily status
-        self.update_daily_status(new_items, removed_items, changed_items)
 
         # Send notifications if there are any changes (focused filtering applied in formatter)
         if new_items or removed_items or changed_items:
             message = self.formatter.format_changes_message(
                 new_items, removed_items, changed_items, current_data
             )
-
-            # Only send if the formatted message has actual content
             if message and "Key Change" in message:
                 self.send_telegram_alert(message)
+                self.logger.info("Changes detected and notification sent!")
             else:
-                self.logger.info("No relevant changes detected for notifications.")
+                self.logger.info("Changes detected but no relevant notifications to send.")
         else:
             self.logger.info("No changes detected.")
 
-        # Display results
-        if not current_items:
-            self.logger.info("No items found.")
-        else:
-            self.logger.debug("Found %s items:", len(current_items))
-            for item in current_items:
-                self.formatter.display_item(item)
+        # Display current items
+        self.logger.info("Current items:")
+        for item in current_items:
+            self.logger.info("  %s", self.formatter.display_item(item))
 
         # Save current data (use converted dict format for JSON serialization)
         self.save_current_data(current_data)
 
-        # Send daily status update (will only send on first run of the day)
-        self.send_daily_status(len(current_items))
-
     def _configure_telegram(self) -> None:
         """Configure Telegram notifications."""
         if self.env.telegram_api_token and self.env.telegram_chat_id:
-            try:
-                self.telegram = TelegramSender(
-                    self.env.telegram_api_token, self.env.telegram_chat_id
-                )
-                self.logger.debug("Telegram notifications enabled.")
-            except Exception as e:
-                self.logger.error("Failed to initialize Telegram: %s", str(e))
-                self.telegram = None
+            self.telegram_sender = TelegramSender(
+                self.env.telegram_api_token, self.env.telegram_chat_id
+            )
+            self.logger.info("Telegram notifications enabled.")
         else:
-            self.telegram = None
-            self.logger.warning("Telegram notifications are not enabled.")
+            self.telegram_sender = None
+            self.logger.warning(
+                "Telegram notifications disabled. Set TELEGRAM_API_TOKEN and TELEGRAM_CHAT_ID."
+            )
 
     def send_telegram_alert(self, message: str) -> None:
         """Send a Telegram alert."""
-        if hasattr(self, "telegram") and self.telegram:
+        if self.telegram_sender:
             try:
-                self.telegram.send_message(message, parse_mode="HTML")
+                self.telegram_sender.send_message(message)
                 self.logger.info("Telegram alert sent successfully.")
             except Exception as e:
                 self.logger.error("Failed to send Telegram alert: %s", str(e))
         else:
-            self.logger.warning("Telegram notifications are not enabled. Message not sent.")
+            self.logger.warning("Telegram not configured. Alert not sent.")
 
     def load_previous_data(self) -> list[dict[str, Any]]:
         """Load previous data from file."""
         try:
             with Path(self.data_file).open(encoding="utf-8") as f:
                 data = json.load(f)
-
-            # Handle both old format (list) and new format (dict with history)
-            if isinstance(data, list):
-                self.logger.debug("Previous data loaded from %s (legacy format).", self.data_file)
-                return data
-            if isinstance(data, dict) and "current" in data:
-                self.logger.debug("Previous data loaded from %s.", self.data_file)
-                return data["current"]
-
-            self.logger.warning("Unexpected data format in %s. Starting fresh.", self.data_file)
-            return []
+                # Handle both old format (list) and new format (dict with current/previous)
+                if isinstance(data, list):
+                    return data
+                return data.get("current", [])
         except FileNotFoundError:
-            self.logger.warning("No previous data file found. Starting fresh.")
+            self.logger.info("No previous data found. This might be the first run.")
             return []
-        except json.JSONDecodeError:
-            self.logger.error("Error decoding previous data file. Starting fresh.")
+        except json.JSONDecodeError as e:
+            self.logger.error("Failed to parse previous data: %s", str(e))
             return []
 
     def save_current_data(self, items: list[dict[str, Any]]) -> None:
@@ -199,12 +179,10 @@ class SiteMonitor[ItemType]:
             existing_data: dict[str, Any] = {}
             try:
                 with Path(self.data_file).open(encoding="utf-8") as f:
-                    loaded_data = json.load(f)
-                    # Handle legacy format
-                    if isinstance(loaded_data, list):
-                        existing_data = {"current": loaded_data}
-                    elif isinstance(loaded_data, dict):
-                        existing_data = loaded_data
+                    existing_data = json.load(f)
+                    # Handle migration from old format
+                    if isinstance(existing_data, list):
+                        existing_data = {"current": existing_data}
             except (FileNotFoundError, json.JSONDecodeError):
                 pass
 
@@ -212,156 +190,60 @@ class SiteMonitor[ItemType]:
             new_data = {
                 "current": items,
                 "previous": existing_data.get("current", []),
-                "timestamp": datetime.now(tz=TZ).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "previous_timestamp": existing_data.get("timestamp"),
             }
 
             with Path(self.data_file).open("w", encoding="utf-8") as f:
                 json.dump(new_data, f, indent=2)
-            self.logger.debug("Data saved to %s with history.", self.data_file)
+            self.logger.debug("Data saved to %s", self.data_file)
         except Exception as e:
             self.logger.error("Failed to save data: %s", str(e))
 
-    def send_daily_status(self, items_checked: int):
-        """Send a daily status update on the first run of each day."""
-        today = datetime.now(tz=TZ).date()
-        now = datetime.now(tz=TZ)
-
-        try:
-            with Path(self.status_file).open(encoding="utf-8") as f:
-                status_data = json.load(f)
-        except FileNotFoundError:
-            status_data = {"last_sent": None, "changes": 0}
-
-        last_sent = (
-            datetime.strptime(status_data["last_sent"], "%Y-%m-%d").replace(tzinfo=TZ).date()
-            if status_data["last_sent"]
-            else None
-        )
-        changes = status_data["changes"]
-
-        if last_sent is None or last_sent < today:
-            last_report_date = last_sent.strftime("%Y-%m-%d") if last_sent else "N/A"
-            message = (
-                f"<b>📅 Daily Status Update ({today}):</b>\n\n"
-                f"✅ <b>Monitor Status:</b> Running smoothly at {now.strftime('%I:%M %p')}.\n"
-                f"🔍 <b>Items Tracked:</b> {items_checked}\n"
-                f"📈 <b>Changes Detected:</b> {changes} update{'s' if changes != 1 else ''} since {last_report_date}.\n\n"
-                f"⏰ Next update will be tomorrow!"
-            )
-            self.send_telegram_alert(message)
-            self.logger.debug("Sent daily status: %s", message)
-
-            # Reset the counter and update last sent date
-            status_data = {"last_sent": today.strftime("%Y-%m-%d"), "changes": 0}
-        else:
-            self.logger.debug("Daily status already sent today. Next update will be tomorrow.")
-
-        with Path(self.status_file).open("w", encoding="utf-8") as f:
-            json.dump(status_data, f)
-
-    def update_daily_status(
-        self,
-        new_items: list[Any],
-        removed_items: list[Any],
-        changed_items: list[ItemChange],
-    ):
-        """Update the daily status with new changes."""
-        try:
-            with Path(self.status_file).open(encoding="utf-8") as f:
-                status_data = json.load(f)
-        except FileNotFoundError:
-            status_data = {"last_sent": None, "changes": 0}
-
-        # Ensure changes is an integer before adding to it
-        if (
-            "changes" not in status_data
-            or not isinstance(status_data["changes"], int)
-            or status_data["changes"] is None
-        ):
-            status_data["changes"] = 0
-
-        # Calculate total changes
-        total_changes = len(new_items) + len(removed_items) + len(changed_items)
-        status_data["changes"] = int(status_data["changes"]) + total_changes
-
-        with Path(self.status_file).open("w", encoding="utf-8") as f:
-            json.dump(status_data, f)
-
-    def send_test_alert(self, sample_data: list[dict[str, Any]] | None = None):
-        """Send a test notification with sample data."""
-        self.logger.info("Sending test alert via Telegram.")
-
-        if sample_data is None:
-            sample_data = [{"test": "data", "id": "1"}, {"test": "data", "id": "2"}]
-
-        # Import ItemChange for runtime usage
-        from scrapechecker.types import FieldChange, ItemChange
-
-        # Create sample changes using ItemChange objects
-        new_items = sample_data[:1]
-        removed_items = [{"test": "removed", "id": "3"}]
-
-        # Create a sample ItemChange object
-        old_item = {"test": "old", "id": "2"}
-        new_item = {"test": "new", "id": "2"}
-        field_change = FieldChange(field_name="test", old_value="old", new_value="new")
-        item_change = ItemChange(
-            old_item=old_item, new_item=new_item, changes={"test": field_change}
-        )
-        changed_items = [item_change]
-
-        # Format and send the test message
-        message = self.formatter.format_changes_message(
-            new_items, removed_items, changed_items, sample_data
-        )
-        self.send_telegram_alert(f"<b>--- TEST NOTIFICATION ---</b>\n\n{message}")
-
     def replay_last_changes(self) -> str | None:
-        """Replay the last detected changes for testing notification formatting.
+        """Replay the last detected changes for testing."""
+        self.logger.info("Replaying last detected changes...")
 
-        Returns:
-            The formatted change message if history is available, None otherwise.
-        """
         try:
             with Path(self.data_file).open(encoding="utf-8") as f:
                 data = json.load(f)
 
-            if not isinstance(data, dict) or "current" not in data or "previous" not in data:
-                self.logger.warning("No change history available for replay.")
+            # Handle both old and new data formats
+            if isinstance(data, list):
+                self.logger.warning("No change history available in old data format.")
                 return None
 
-            current_items = data["current"]
-            previous_items = data["previous"]
+            current_data = data.get("current", [])
+            previous_data = data.get("previous", [])
 
-            if not previous_items:
-                self.logger.warning("No previous data available for replay.")
+            if not current_data or not previous_data:
+                self.logger.warning(
+                    "Insufficient data for replay. Need both current and previous data."
+                )
                 return None
 
-            # Find changes between previous and current
+            # Find changes using the same logic as monitor()
             new_items, removed_items, changed_items = self.change_finder.find_changes(
-                current_items, previous_items
+                current_data, previous_data
             )
 
-            # Use the same focused filtering as live monitoring
-            if not (new_items or removed_items or changed_items):
-                self.logger.info("No changes to replay.")
-                return None
+            if new_items or removed_items or changed_items:
+                message = self.formatter.format_changes_message(
+                    new_items, removed_items, changed_items, current_data
+                )
+                self.logger.info(
+                    "Replayed changes: %d new, %d removed, %d changed",
+                    len(new_items),
+                    len(removed_items),
+                    len(changed_items),
+                )
+                return message
+            self.logger.info("No changes found in replay data.")
+            return None
 
-            # Format the message with focused filtering
-            message = self.formatter.format_changes_message(
-                new_items, removed_items, changed_items, current_items
-            )
-
-            self.logger.info("Replayed changes from history:")
-            self.logger.info(message)
-
-            # Send via Telegram
-            self.send_telegram_alert(message)
-            self.logger.info("Replayed message sent via Telegram.")
-
-            return message
-
+        except FileNotFoundError:
+            self.logger.error("No data file found for replay.")
+            return None
         except Exception as e:
             self.logger.error("Failed to replay changes: %s", str(e))
             return None

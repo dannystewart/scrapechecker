@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from polykit import PolyArgs
 
-from scrapechecker.example.simple_scraper import ProductScraper, SimpleScraper
 from scrapechecker.example.simple_formatter import SimpleFormatter
+from scrapechecker.example.simple_scraper import ProductScraper, SimpleScraper
 from scrapechecker.site_monitor import SiteMonitor
 
 if TYPE_CHECKING:
@@ -58,10 +58,12 @@ def main():
 
     # Create monitor
     formatter = SimpleFormatter(scraper)
-    monitor = SiteMonitor(url=args.url, site_scraper=scraper, formatter=formatter, data_file=args.data_file)
+    monitor = SiteMonitor(
+        url=args.url, site_scraper=scraper, formatter=formatter, data_file=args.data_file
+    )
 
     if args.test:
-        monitor.send_test_alert()
+        monitor.check_current_status()
     else:
         monitor.monitor()
 

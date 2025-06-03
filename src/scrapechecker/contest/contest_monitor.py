@@ -25,14 +25,8 @@ env.add_var("CONTEST_URL")
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = PolyArgs(description="Monitor Roo's pet contest rankings and votes", min_arg_width=24)
-    parser.add_argument(
-        "--current",
-        action="store_true",
-        help="Show current status with change detection but don't save data",
-    )
-    parser.add_argument(
-        "--previous", action="store_true", help="replay last detected changes for testing"
-    )
+    parser.add_argument("--current", action="store_true", help="send changes since last check")
+    parser.add_argument("--previous", action="store_true", help="send changes from two checks ago")
     parser.add_argument(
         "--data-dir", help="directory to store contest data (default: user data directory)"
     )
@@ -49,10 +43,8 @@ def main() -> None:
     # Set default data directory using PolyPath if not provided
     if args.data_dir:
         data_file = str(Path(args.data_dir) / "contest_data.json")
-        status_file = str(Path(args.data_dir) / "contest_status.json")
     else:
         data_file = str(paths.from_data("contest_data.json"))
-        status_file = str(paths.from_data("contest_status.json"))
 
     # Set the URL
     url = env.contest_url
@@ -69,7 +61,6 @@ def main() -> None:
         site_scraper=scraper,
         formatter=formatter,
         data_file=data_file,
-        status_file=status_file,
     )
 
     if args.current:
