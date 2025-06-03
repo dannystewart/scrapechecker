@@ -56,7 +56,9 @@ class ContestFormatter(BaseFormatter[ContestItem]):
             message_parts.append(self._format_removed_items(removed_items))
 
         if changed_items:
-            message_parts.append(self._format_changed_items(changed_items, current_items))
+            changed_section = self._format_changed_items(changed_items, current_items)
+            if changed_section:  # Only add if there's actual content
+                message_parts.append(changed_section)
 
         # Add current rankings section if we have current items and there were changes
         if current_items and (new_items or removed_items or changed_items):
