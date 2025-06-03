@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 from polykit.log import PolyLog
 
 if TYPE_CHECKING:
     from selenium.webdriver.firefox.webdriver import WebDriver
 
+ItemType = TypeVar("ItemType")
 
-class BaseScraper(ABC):
+
+class BaseScraper[ItemType](ABC):
     """Abstract base class for site-specific scrapers."""
 
     def __init__(self, url: str, target_item: str | None = None) -> None:
@@ -26,28 +28,28 @@ class BaseScraper(ABC):
         self.logger = PolyLog.get_logger()
 
     @abstractmethod
-    def extract_data(self, driver: WebDriver) -> list[dict[str, Any]]:
+    def extract_data(self, driver: WebDriver) -> list[ItemType]:
         """Extract data from the webpage using the provided driver.
 
         Args:
             driver: The Selenium WebDriver instance.
 
         Returns:
-            A list of dictionaries containing extracted data items.
+            A list of items containing extracted data.
         """
 
     @abstractmethod
-    def get_item_key(self, item: dict[str, Any]) -> str:
+    def get_item_key(self, item: ItemType) -> str:
         """Generate a unique key for an item to track changes.
 
         Args:
-            item: The data item dictionary.
+            item: The data item.
 
         Returns:
             A unique string identifier for the item.
         """
 
-    def filter_items(self, items: list[Any]) -> list[Any]:
+    def filter_items(self, items: list[ItemType]) -> list[ItemType]:
         """Filter items based on criteria. Override if needed.
 
         Args:
@@ -58,11 +60,11 @@ class BaseScraper(ABC):
         """
         return items
 
-    def format_item(self, item: Any) -> str:
+    def format_item(self, item: ItemType) -> str:
         """Format an item for display. Override for custom formatting.
 
         Args:
-            item: The data item (dict, dataclass, or other type).
+            item: The data item.
 
         Returns:
             The formatted string representation of the item.

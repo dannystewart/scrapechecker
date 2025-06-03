@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
     from scrapechecker.types import ItemChange
 
+ItemType = TypeVar("ItemType")
 
-class BaseFormatter(ABC):
+
+class BaseFormatter[ItemType](ABC):
     """Base class for formatters that handle display and messaging for scrapers."""
 
-    def __init__(self, site_scraper: BaseScraper, max_results: int = 10):
+    def __init__(self, site_scraper: BaseScraper[ItemType], max_results: int = 10):
         """Initialize the formatter.
 
         Args:
@@ -45,7 +47,7 @@ class BaseFormatter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def display_item(self, item: Any) -> None:
+    def display_item(self, item: ItemType) -> None:
         """Display a single item to the console.
 
         Args:

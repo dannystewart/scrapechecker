@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from polykit import TZ, PolyEnv, PolyLog
 
@@ -18,8 +18,10 @@ if TYPE_CHECKING:
     from scrapechecker.base_scraper import BaseScraper
     from scrapechecker.types import ItemChange
 
+ItemType = TypeVar("ItemType")
 
-class SiteMonitor:
+
+class SiteMonitor[ItemType]:
     """Generic site monitoring framework.
 
     Args:
@@ -34,8 +36,8 @@ class SiteMonitor:
     def __init__(
         self,
         url: str,
-        site_scraper: BaseScraper,
-        formatter: BaseFormatter,
+        site_scraper: BaseScraper[ItemType],
+        formatter: BaseFormatter[ItemType],
         enable_telegram: bool = True,
         data_file: str = "monitoring_data.json",
         status_file: str = "daily_status.json",
@@ -69,7 +71,7 @@ class SiteMonitor:
         # Convert current items to dicts for ChangeFinder (if they're dataclass objects)
         current_data = []
         for item in current_items:
-            if hasattr(item, 'to_dict'):
+            if hasattr(item, "to_dict"):
                 current_data.append(item.to_dict())
             else:
                 current_data.append(item)
@@ -84,7 +86,7 @@ class SiteMonitor:
         # Send notifications if there are any changes (focused filtering applied in formatter)
         if new_items or removed_items or changed_items:
             message = self.formatter.format_changes_message(
-                new_items, removed_items, changed_items, current_items
+                new_items, removed_items, changed_items, current_data
             )
 
             # Only send if the formatted message has actual content

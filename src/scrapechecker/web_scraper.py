@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class WebScraper:
     """Generic web scraper that works with any site-specific scraper."""
 
-    def __init__(self, url: str, site_scraper: BaseScraper) -> None:
+    def __init__(self, url: str, site_scraper: BaseScraper[Any]) -> None:
         """Initialize the generic web scraper.
 
         Args:

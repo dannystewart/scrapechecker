@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from scrapechecker.types import ItemChange  # noqa: F401
 
 
-class SimpleFormatter(BaseFormatter):
+class SimpleFormatter(BaseFormatter[dict[str, Any]]):
     """Simple formatter that provides basic change notifications without advanced features.
 
     This formatter is suitable for simple scrapers that don't need contest-specific

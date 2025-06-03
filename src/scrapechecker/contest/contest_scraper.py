@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from selenium.webdriver.firefox.webdriver import WebDriver
 
 
-class ContestScraper(BaseScraper):
+class ContestScraper(BaseScraper[ContestItem]):
     """Scraper for pet contest voting sites.
 
     Tracks contestant rankings, vote counts, and changes in position.

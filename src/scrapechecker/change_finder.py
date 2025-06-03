@@ -19,7 +19,7 @@ class ChangeFinder:
         site_scraper: The site-specific scraper for generating item keys.
     """
 
-    def __init__(self, site_scraper: BaseScraper) -> None:
+    def __init__(self, site_scraper: BaseScraper[Any]) -> None:
         """Initialize the change finder."""
         self.logger = PolyLog.get_logger()
         self.site_scraper = site_scraper
@@ -68,7 +68,7 @@ class ChangeFinder:
         return new_items, removed_items, changed_items
 
     def _find_changed_items(
-        self, current_items: dict[str, Any], previous_items: dict[str, Any]
+        self, current_items: dict[str, dict[str, Any]], previous_items: dict[str, dict[str, Any]]
     ) -> list[ItemChange]:
         """Find items that have changed between current and previous data."""
         changed_items = []

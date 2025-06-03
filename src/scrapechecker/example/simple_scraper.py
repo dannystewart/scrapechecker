@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from selenium.webdriver.firefox.webdriver import WebDriver
 
 
-class SimpleScraper(BaseScraper):
+class SimpleScraper(BaseScraper[dict[str, Any]]):
     """Simple scraper that can monitor text content on any webpage."""
 
     def __init__(self, css_selector: str = "body", attribute: str = "text"):
@@ -22,6 +22,7 @@ class SimpleScraper(BaseScraper):
             css_selector: The CSS selector to find elements.
             attribute: The attribute to extract ('text', 'href', etc.) or 'text' for text content.
         """
+        super().__init__(url="", target_item=None)  # URL will be set by WebScraper
         self.css_selector = css_selector
         self.attribute = attribute
 
@@ -58,7 +59,7 @@ class SimpleScraper(BaseScraper):
         return f"Position {item['position']}: {content}"
 
 
-class ProductScraper(BaseScraper):
+class ProductScraper(BaseScraper[dict[str, Any]]):
     """Example scraper for monitoring product listings."""
 
     def extract_data(self, driver: WebDriver) -> list[dict[str, Any]]:
